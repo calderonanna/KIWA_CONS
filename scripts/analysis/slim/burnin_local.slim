@@ -1,0 +1,158 @@
+initialize() {
+	
+	// DEMOGRAPHIC HISTORY
+	//Setup nonWF, Separate Sexes, and Tree Sequence Recording
+	initializeSLiMModelType("nonWF");
+	initializeTreeSeq(checkCoalescence=T);
+	initializeSex();
+	
+	//Define Constants and Globals for Carrying Capacity
+	defineGlobal("K_mean", 4000);
+	defineConstant("phi", 0.9);
+	defineConstant("sigma", 0.1);
+	defineGlobal("logK", log(K_mean));
+	
+	//Define Constants for Age-based Mortality and Define Life History Table 
+	mhy_mort=0.54;//Bocetti et al. 2002
+	fhy_mort=0.63;//Bocetti et al. 2002
+	mahy_mort=0.35;//Bocetti et al. 2002
+	fahy_mort=0.38;//Bocetti et al. 2002
+	defineConstant("mmort", c(mhy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,
+		mahy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,1.0));
+	defineConstant("fmort", c(fhy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,
+		fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,1.0));
+	
+	
+	// GENETICS
+	// Discrete DFE (SLiM5 Manual, pg.789, Kyriazis et al. 2025, and Kim et al.2017)
+	initializeMutationType("m1", 0.5, "f", 0); // neutral 
+	initializeMutationType("m2", 0.45, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.001); return x;"); // weak
+	initializeMutationType("m3", 0.2, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.01 | x >= -0.001); return x;"); // moderate
+	initializeMutationType("m4", 0.05, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.1 | x >= -0.01); return x;"); // strong
+	initializeMutationType("m5", 0.0, "s", "do x=rgamma(1,-0.01314833,0.186); while (x >= -0.1); return x;"); // semi-lethal
+	initializeMutationType("m6", 0.0, "f", -1.0); // lethal
+	
+	// Mutation Proportions
+	P_neu = 0.189; // 0-fold=12564910
+	P_del = 0.811; // 4-fold=2946013
+	P_lethal = 0.005*P_del;
+	P_nonlethal = 0.995*P_del;
+	P_weak = 0.491*P_nonlethal;
+	P_moderate = 0.247*P_nonlethal;
+	P_strong = 0.236*P_nonlethal;
+	P_semilethal = 0.026*P_nonlethal;
+	
+	initializeGenomicElementType("g1", c(m1,m2,m3,m4,m5,m6), c(P_neu, P_weak, P_moderate, P_strong, P_semilethal, P_lethal));
+	initializeGenomicElementType("g2", m1, 1);
+	
+	// Import Genome Structure
+	path = "/Users/abc6435/Desktop/KIWA_CONS/data/slim/genome_structure/";
+	chrs = c(1,100,2:4,400,5:15,17:29);
+	lengths=c(114063801,71386623,150066519,111140737,70957965,19902516,62006421,
+		35832348,38264695,31225694,25769210,20450569,20895826,20804877,18063608,16588652,
+		14319805,11726895,12543585,11332392,15069120,7790416,4356307,7079006,7805957,
+		1781809,6243642,4714420,5445509,962733);
+	
+	for (i in 0:(size(chrs)-1)) {
+		chr = chrs[i];
+		length = lengths[i];
+		
+		initializeChromosome(id=chr, length=length);
+		
+		exons = readFile(path + "exon_chr" + chr + ".txt");
+		for (exon in exons) {
+			components = strsplit(exon, "\t");
+			initializeGenomicElement(g1, asInteger(components[0])-1, asInteger(components[1])-1);
+		}
+		
+		intergenics = readFile(path + "intergenic_chr" + chr + ".txt");
+		for (intergenic in intergenics) {
+			components = strsplit(intergenic, "\t");
+			initializeGenomicElement(g2, asInteger(components[0])-1, asInteger(components[1])-1);
+		}
+		
+		initializeRecombinationRate(3e-8);
+		initializeMutationRate(4e-9);
+	}
+}
+
+// REPRODUCTION
+reproduction(){
+	//Age-Limited Reproduction and Age-Related Pairing Success (Jukkala 2022)
+	f = p1.individuals[p1.individuals.sex == "F" & p1.individuals.age >= 1];
+	asym = (p1.individuals[p1.individuals.sex == "M" & p1.individuals.age >= 2]);
+	sym = (p1.individuals[p1.individuals.sex == "M" & p1.individuals.age == 1]);
+	asym_breeders = sample(asym, asInteger(round(size(asym) * 0.994)));
+	sym_breeders = sample(sym, asInteger(round(size(sym) * 0.86)));
+	m = c(asym_breeders, sym_breeders);
+	
+	//Assortative-Age Pairing (Jukkala 2022)
+	shuf_f = sample(f, size(f), replace=F);
+	shuf_m = sample(m, size(m), replace=T);
+	n = min(size(shuf_f), size(shuf_m));
+	
+	//Fledglings Per Monogomous Pair
+	for (i in seq(0, n - 1))
+	{
+		baseline_fledglings = max(0,asInteger(round(rnorm(n = 1, mean = 3.3, sd = 0.16))));
+		mom = shuf_f[i];
+		dad = shuf_m[i];
+		p1.addCrossed(mom, dad, count = baseline_fledglings);
+	}
+	
+	self.active = 0;
+}
+
+// RUN SIMULATION
+1 early() {
+	sim.addSubpop("p1", 4000);
+}
+
+early() {
+	//Sex and Age Based Individual Fitness Scaling
+	males = p1.individuals[p1.individuals.sex=="M"];
+	females = p1.individuals[p1.individuals.sex=="F"];
+	m_ages = p1.individuals[p1.individuals.sex=="M"].age;
+	f_ages = p1.individuals[p1.individuals.sex=="F"].age;
+	m_mort = mmort[m_ages];
+	f_mort = fmort[f_ages];
+	m_surv = 1-m_mort;
+	f_surv = 1-f_mort;
+	males.fitnessScaling = m_surv;
+	females.fitnessScaling = f_surv;
+	
+	//K-based Population Fintess Scaling (Ornstein-Uhlenbeck Discrete); (Kyriazis et al. 2021)
+	logK = (1-phi) * log(K_mean) + phi * logK + rnorm(n=1, mean=0, sd=sigma);
+	K = exp(logK);
+	p1.fitnessScaling = K/(p1.individualCount * mean(c(m_surv, f_surv)));
+	catn(paste(sim.cycle + ", K=" + K));
+}
+
+// Export Genomewide Neutral Genetic Diversity and Coalesence State
+1:100 late() {
+    if (sim.cycle % 10 == 0) {
+        sumpi = 0.0;
+        seqlen = 0.0;
+
+        for (chr in sim.chromosomes) {
+            L = chr.lastPosition + 1;
+            pi = calcPi(p1.haplosomes[p1.haplosomes.chromosome == chr]);
+
+            sumpi = sumpi + pi * L;
+            seqlen = seqlen + L;
+        }
+
+        genome_pi = sumpi / seqlen;
+
+        writeFile("~/Desktop/KIWA_CONS/data/slim/coalesence.txt",
+            sim.cycle + "," +
+            genome_pi + "," +
+            sim.treeSeqCoalesced() + "," +
+            "R1",
+            append=T);
+
+        if (sim.treeSeqCoalesced() | sim.cycle >= 100)
+            sim.simulationFinished();
+				sim.outputFull("~/Desktop/KIWA_CONS/data/slim/burnin_4K.txt");
+    }
+}

@@ -1,0 +1,65 @@
+---
+title: "population_size"
+author: "Anna Maria Calderon"
+date: "2026-06-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(reshape2)
+```
+
+# Import and Modify Data
+
+```{r import_data, include=FALSE}
+#Census Data
+setwd("~/Desktop/KIWA_CONS/data/census/")
+Nc <- read.csv("census_1951_2025.csv")
+Nc <- Nc[,c("Year", "Rangewide.Singing.Males")]
+colnames(Nc) <- c("Year", "Nm")
+Nc$Nm <- as.numeric(Nc$Nm)
+Nc <- na.omit(Nc)
+Nc$data <- "empirical"
+
+#Simulated Nc Data
+setwd("~/Desktop/KIWA_CONS/data/slim/")
+Nc_sim <- read.csv("population_size.txt", col.names = c("Year", "K", "N", "Nm", "rep") )
+Nc_sim$data <- "simulated"
+
+#Summarize Simulated Data
+Nc_sim_m <- melt(Nc_sim, id.vars = c("Year", "rep", "data"), 
+                 variable.name = "type", value.name="size")
+sim_sum <- 
+  Nc_sim_m %>% 
+  group_by(Year, type) %>%
+  summarize(mean = mean(size, na.rm = TRUE),
+            q025 = quantile(size, 0.025, na.rm = TRUE),
+            q975 = quantile(size, 0.975, na.rm = TRUE),
+            .groups = "drop")
+```
+
+# Plot
+
+```{r plot, include=FALSE}
+
+ggplot(sim_sum, aes(x = Year)) +
+  geom_ribbon(aes(ymin = q025, ymax = q975, fill = type), alpha = 0.25, color = NA) +
+  geom_line(aes(y = mean, color = type), linewidth = 0.8) +
+  geom_point(data = Nc, aes(x = Year, y = Nm), color = "#178C99", inherit.aes = FALSE) +
+  scale_y_continuous(expand = c(0,0), limits = c(0,6000), breaks = seq(0,6000, by=500)) +
+  scale_x_continuous(limits = c(1951, 2025), breaks = seq(1951,2025, by=2)) +
+  scale_color_manual(values=c("black","orange","#00EAFF")) +
+  scale_fill_manual(values=c("black","orange","#00EAFF")) +
+  labs(x = NULL, y = "N and K") +
+  theme(legend.title = element_blank(),
+    axis.text.x = element_text(angle = 60, size=8, hjust=1,color="black"),
+    axis.text.y = element_text(size=8, color="black"),
+    text = element_text(size = 8),
+    panel.background = element_blank(),
+    panel.grid = element_blank(),
+    panel.border = element_rect(color = "black", fill = NA))
+```
