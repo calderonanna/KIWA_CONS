@@ -25,8 +25,8 @@ samples=\$(realpath /storage/group/zps5164/default/abc6435/KIWA_CONS/data/gatk/g
 gvcfs="/storage/home/abc6435/SzpiechLab/abc6435/KIWA_CONS/data/gatk/gvcf"
 
 #Zip g.vcf files
-for i in $(cat $scripts/cKIWA_IDS.txt); do
-    bgzip -c $gvcfs/${i}.g.vcf > $gvcfs/${i}.g.vcf.gz
+for i in \$(cat \$scripts/cKIWA_IDS.txt); do
+    bgzip -c \$gvcfs/${i}.g.vcf > \$gvcfs/${i}.g.vcf.gz
 done
 
 #GenomicsDBImport
