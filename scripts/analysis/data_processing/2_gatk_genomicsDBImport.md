@@ -4,7 +4,7 @@ https://hpc.nih.gov/training/gatk_tutorial/genomics-db-import.html
 
 To make this run faster, I will be running GATK scripts on invdidual chromosomes. GenomicsDBImport takes many samples and combines them by genomic position. Then once combined, it stores them in a GenomicsDB (database). `GenomicsDBImport` is kind of like `CombineGVCFs` in that they both combine gvcfs, but the differene is in how they do it. `CombineGVCFs` merges all samples into one multi-sample gVCF and it is appropriate for about a dozen samples. `GenomicsDBImport` produces a queryable database, can be faster and more efficient for hundreds of samples. 
 
-## Zip gvcfs
+## Unzip gvcfs
 ```bash
 nano $scripts/zip_gvcfs.bash
 #!/bin/bash
@@ -23,7 +23,7 @@ scripts="/storage/group/zps5164/default/abc6435/KIWA_CONS/scripts"
 
 #Zip g.vcf files
 for i in `cat $scripts/cKIWA_IDS.txt`; do
-    bgzip -c $gvcfs/${i}.g.vcf > $gvcfs/${i}.g.vcf.gz;
+    gunzip $gvcfs/${i}.g.vcf.gz;
 done
 ```
 
