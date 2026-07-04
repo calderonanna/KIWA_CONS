@@ -34,4 +34,4 @@ done
 #Submit Scripts
 for i in $(cat $scripts/autochrs.txt); do
     sbatch $scripts/gatk_GenomicsDBI_cKIWA${i}.bash
-done"
+done
