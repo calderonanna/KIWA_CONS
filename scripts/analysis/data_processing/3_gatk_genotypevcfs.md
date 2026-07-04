@@ -1,5 +1,5 @@
 # gatk GenotypeGVCFs
-For DFE inference with dadi, I want to include both variant and invariant sites so I included the flag `--include-non-variant-sites true`.  
+For demographic inference include both variant and invariant sites so I included the flag `--include-non-variant-sites true`.  
 
 ```bash
 for i in $(cat $scripts/autochrs.txt); do
@@ -11,13 +11,13 @@ for i in $(cat $scripts/autochrs.txt); do
 #SBATCH --account=open
 #SBATCH --partition=standard
 #SBATCH --job-name=gatk_GenotypeGVCFs_${i}
-#SBATCH --output=~/SzpiechLab/abc6435/KIWA_CONS/err_out/%x.%j.out
-#SBATCH --error=~/SzpiechLab/abc6435/KIWA_CONS/err_out/%x.%j.err
+#SBATCH --output=/storage/group/zps5164/default/abc6435/KIWA_CONS/err_out/%x.%j.out
+#SBATCH --error=/storage/group/zps5164/default/abc6435/KIWA_CONS/err_out/%x.%j.err
 
 #Set Variables
-scripts="~/SzpiechLab/abc6435/KIWA_CONS/scripts"
-ref="~/SzpiechLab/abc6435/KIWA_CONS/data/mywa_reference/mywagenomev2.1.fa"
-allsites="~/SzpiechLab/abc6435/KIWA_CONS/data/gatk/allsites_vcf"
+scripts="/storage/group/zps5164/default/abc6435/KIWA_CONS/scripts"
+ref="/storage/group/zps5164/default/abc6435/KIWA_CONS/data/mywa_reference/mywagenomev2.1.fa"
+allsites="/storage/group/zps5164/default/abc6435/KIWA_CONS/data/gatk/allsites_vcf"
 
 #GenotypeGVCFs
 gatk --java-options "-Xmx3g" GenotypeGVCFs \\
