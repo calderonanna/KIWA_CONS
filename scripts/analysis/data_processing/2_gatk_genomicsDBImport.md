@@ -47,20 +47,3 @@ done
 for i in $(cat $scripts/autochrs.txt); do
     sbatch $scripts/gatk_GenomicsDBI_cKIWA${i}.bash
 done"
-ref="/storage/group/zps5164/default/abc6435/KIWA_CONS/data/mywa_reference/mywagenomev2.1.fa"
-allsites="/storage/group/zps5164/default/abc6435/KIWA_CONS/data/gatk/allsites_vcf"
-samples=\$(realpath /storage/group/zps5164/default/abc6435/KIWA_CONS/data/gatk/gvcf/*.g.vcf.gz | sed 's/^/--variant /')
-
-#GenomicsDBImport
-gatk --java-options "-Xmx10g" GenomicsDBImport \\
-    \$samples \\
-    --genomicsdb-workspace-path \$allsites/${i} \\
-     -L ${i}
-EOT
-done
-
-#Submit Scripts
-for i in $(cat $scripts/autochrs.txt); do
-    sbatch $scripts/gatk_GenomicsDBI_cKIWA${i}.bash
-done
-```
