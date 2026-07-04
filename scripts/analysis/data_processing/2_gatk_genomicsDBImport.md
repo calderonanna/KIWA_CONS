@@ -14,14 +14,42 @@ for i in $(cat $scripts/autochrs.txt); do
 #SBATCH --time=24:00:00
 #SBATCH --account=dut374_sc_default
 #SBATCH --job-name=gatk_GenomicsDBI_cKIWA${i}
-#SBATCH --output=~/SzpiechLab/abc6435/KIWA_CONS/err_out/%x.%j.out
-#SBATCH --error=~/SzpiechLab/abc6435/KIWA_CONS/err_out/%x.%j.err
+#SBATCH --output=/storage/group/zps5164/default/abc6435/KIWA_CONS/err_out/%x.%j.out
+#SBATCH --error=/storage/group/zps5164/default/abc6435/KIWA_CONS/err_out/%x.%j.err
 
 #Set Variables
-scripts="~/SzpiechLab/abc6435/KIWA_CONS/scripts"
-ref="~/SzpiechLab/abc6435/KIWA_CONS/data/mywa_reference/mywagenomev2.1.fa"
-allsites="~/SzpiechLab/abc6435/KIWA_CONS/data/gatk/allsites_vcf"
-samples=\$(realpath ~/SzpiechLab/abc6435/KIWA_CONS/data/gatk/gvcf/*.g.vcf.gz | sed 's/^/--variant /')
+scripts="for i in $(cat $scripts/autochrs.txt); do
+    cat<<EOT > $scripts/gatk_GenomicsDBI_cKIWA${i}.bash
+#!/bin/bash
+#SBATCH --nodes=1
+#SBATCH --mem=3GB
+#SBATCH --time=24:00:00
+#SBATCH --account=dut374_sc_default
+#SBATCH --job-name=gatk_GenomicsDBI_cKIWA${i}
+#SBATCH --output=/storage/group/zps5164/default/abc6435/KIWA_CONS/err_out/%x.%j.out
+#SBATCH --error=/storage/group/zps5164/default/abc6435/KIWA_CONS/err_out/%x.%j.err
+
+#Set Variables
+scripts="/storage/group/zps5164/default/abc6435/KIWA_CONS/scripts"
+ref="/storage/group/zps5164/default/abc6435/KIWA_CONS/data/mywa_reference/mywagenomev2.1.fa"
+allsites="/storage/group/zps5164/default/abc6435/KIWA_CONS/data/gatk/allsites_vcf"
+samples=\$(realpath /storage/group/zps5164/default/abc6435/KIWA_CONS/data/gatk/gvcf/*.g.vcf.gz | sed 's/^/--variant /')
+
+#GenomicsDBImport
+gatk --java-options "-Xmx10g" GenomicsDBImport \\
+    \$samples \\
+    --genomicsdb-workspace-path \$allsites/${i} \\
+     -L ${i}
+EOT
+done
+
+#Submit Scripts
+for i in $(cat $scripts/autochrs.txt); do
+    sbatch $scripts/gatk_GenomicsDBI_cKIWA${i}.bash
+done"
+ref="/storage/group/zps5164/default/abc6435/KIWA_CONS/data/mywa_reference/mywagenomev2.1.fa"
+allsites="/storage/group/zps5164/default/abc6435/KIWA_CONS/data/gatk/allsites_vcf"
+samples=\$(realpath /storage/group/zps5164/default/abc6435/KIWA_CONS/data/gatk/gvcf/*.g.vcf.gz | sed 's/^/--variant /')
 
 #GenomicsDBImport
 gatk --java-options "-Xmx10g" GenomicsDBImport \\
