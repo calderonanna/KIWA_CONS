@@ -22,6 +22,12 @@ scripts="/storage/group/zps5164/default/abc6435/KIWA_CONS/scripts"
 ref="/storage/group/zps5164/default/abc6435/KIWA_CONS/data/mywa_reference/mywagenomev2.1.fa"
 allsites="/storage/group/zps5164/default/abc6435/KIWA_CONS/data/gatk/allsites_vcf"
 samples=\$(realpath /storage/group/zps5164/default/abc6435/KIWA_CONS/data/gatk/gvcf/*.g.vcf.gz | sed 's/^/--variant /')
+gvcfs="/storage/home/abc6435/SzpiechLab/abc6435/KIWA_CONS/data/gatk/gvcf"
+
+#Zip g.vcf files
+for i in $(cat $scripts/cKIWA_IDS.txt); do
+    bgzip -c $gvcfs/${i}.g.vcf > $gvcfs/${i}.g.vcf.gz
+done
 
 #GenomicsDBImport
 gatk --java-options "-Xmx10g" GenomicsDBImport \\
