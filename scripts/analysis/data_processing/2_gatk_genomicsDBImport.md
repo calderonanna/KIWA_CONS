@@ -33,7 +33,7 @@ for i in $(cat $scripts/autochrs.txt); do
     cat<<EOT > $scripts/gatk_GenomicsDBI_cKIWA${i}.bash
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --mem=10GB
+#SBATCH --mem=5GB
 #SBATCH --time=24:00:00
 #SBATCH --account=dut374_sc_default
 #SBATCH --job-name=gatk_GenomicsDBI_cKIWA${i}
@@ -47,7 +47,7 @@ allsites="/storage/group/zps5164/default/abc6435/KIWA_CONS/data/gatk/allsites_vc
 samples=\$(realpath /storage/group/zps5164/default/abc6435/KIWA_CONS/data/gatk/gvcf/*.g.vcf.gz | sed 's/^/--variant /')
 
 #GenomicsDBImport
-gatk --java-options "-Xmx10g" GenomicsDBImport \\
+gatk --java-options "-Xmx5g" GenomicsDBImport \\
     \$samples \\
     --genomicsdb-workspace-path \$allsites/${i} \\
      -L ${i}
