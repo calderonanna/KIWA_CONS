@@ -18,20 +18,19 @@ scripts="/storage/home/abc6435/SzpiechLab/abc6435/KIWA_CONS/scripts"
 work="/storage/home/abc6435/SzpiechLab/abc6435/KIWA_CONS/data/smcpp"
 results="/storage/home/abc6435/SzpiechLab/abc6435/KIWA_CONS/data/smcpp/results"
 
-#virens
+#Estimate
 singularity exec --bind $PWD:/mnt $bin/smcpp.sif \
     smc++ estimate \
-    -o $results/virens \
+    -o $results/cKIWA \
     4.6e-9 \
     --polarization-error 0.5 \
-    $work/chr*_virens.smc.gz
-    
+    $work/chr*.smc.gz
 
-#waynei
+#Plot
 singularity exec --bind $PWD:/mnt $bin/smcpp.sif \
-    smc++ estimate \
-    -o $results/waynei \
-    4.6e-9 \
-    --polarization-error 0.5 \
-    $work/chr*_waynei.smc.gz
+    smc++ plot \
+    -g 2 \
+    --csv \
+    $results/cKIWA/cKIWA_plot.pdf \
+    $results/cKIWA/model.final.json
 ```

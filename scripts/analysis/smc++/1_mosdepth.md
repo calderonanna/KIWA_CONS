@@ -1,17 +1,17 @@
-# Mask
-Create a bed file containing a list of position will be marked as missing across all samples in the outputted SMC++ dataset. Without this, ROHan cannot distinguish between missing data and long ROH. 
+# Mosdepth
+Create a bed file containing a list of position will be marked as missing across all samples in the outputted SMC++ dataset. Without this, SMC++ cannot distinguish between missing data and long ROH. 
 
-## Mosdepth 
+## Run `mosdepth` 
 Used to create a set of "callable" regions 
 https://github.com/brentp/mosdepth
 
 ```bash 
+nano $scripts/mosdepth.bash
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --mem=50GB
 #SBATCH --time=48:00:00
-#SBATCH --account=open
-#SBATCH --partition=himem
+#SBATCH --account=dut374_sc_default
 #SBATCH --job-name=mosdepth
 #SBATCH --output=/storage/group/zps5164/default/abc6435/KIWA_CONS/err_out/%x.%j.out
 #SBATCH --error=/storage/group/zps5164/default/abc6435/KIWA_CONS/err_out/%x.%j.err
@@ -28,23 +28,23 @@ export MOSDEPTH_Q1=LOW_COVERAGE
 export MOSDEPTH_Q2=CALLABLE 
 export MOSDEPTH_Q3=HIGH_COVERAGE 
 
-for i in `cat $scripts/btnw_ids.txt`; do
+for i in `cat $scripts/cKIWA_IDS.txt`; do
     $mosdepth \
         -n \
         --quantize 0:1:5:150:\
         $out/${i} \
-        $bam/${i}.markdup.bam;
+        $bam/${i}_sorted_marked.bam;
 done
 ```
 
 ## Filter 
 ```bash
+nano $scripts/mosdepth_filter.bash
 #!/bin/bash
 #SBATCH --nodes=1
 #SBATCH --mem=4GB
 #SBATCH --time=48:00:00
-#SBATCH --account=open
-#SBATCH --partition=basic
+#SBATCH --account=dut374_sc_default
 #SBATCH --job-name=mosdepth_filter
 #SBATCH --output=/storage/group/zps5164/default/abc6435/KIWA_CONS/err_out/%x.%j.out
 #SBATCH --error=/storage/group/zps5164/default/abc6435/KIWA_CONS/err_out/%x.%j.err
@@ -53,7 +53,7 @@ done
 scripts="/storage/home/abc6435/SzpiechLab/abc6435/KIWA_CONS/scripts"
 work="/storage/home/abc6435/SzpiechLab/abc6435/KIWA_CONS/data/mosdepth"
 
-for i in `cat $scripts/btnw_ids.txt`; do
+for i in `cat $scripts/cKIWA_IDS.txt`; do
     zcat $work/${i}.quantized.bed.gz \
         | awk '($4=="LOW_COVERAGE" || $4=="NO_COVERAGE"){print $0}' \
         | cut -f1,2,3 \
@@ -71,11 +71,6 @@ work="/storage/home/abc6435/SzpiechLab/abc6435/KIWA_CONS/data/mosdepth/uncallabl
 
 #Intesect uncallable regions and report regions with 3 or more samples
 bedtools multiinter -header -i $work/*_mask.bed | awk '$4>= 3' | cut -f1,2,3 >> $work/mask.bed
-
-#Change Chromosome Names
-while read -r i j; do
-    sed -i "s/${i}/${j}/g" $work/mask.bed;
-done < $scripts/rename_chrs.txt
 
 #Split by chromosome
 for i in $(cat $scripts/autochrs.txt); do
