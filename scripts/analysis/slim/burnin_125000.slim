@@ -7,7 +7,7 @@ initialize() {
 	initializeSex();
 	
 	//Define Constants and Globals for Carrying Capacity
-	defineGlobal("K_mean", 4000);
+	defineGlobal("K_mean", 125000);
 	defineConstant("phi", 0.9);
 	defineConstant("sigma", 0.1);
 	defineGlobal("logK", log(K_mean));
@@ -46,7 +46,7 @@ initialize() {
 	initializeGenomicElementType("g2", m1, 1);
 	
 	// Import Genome Structure Chromosome 1
-	path = "/Users/abc6435/Desktop/KIWA_CONS/data/slim/genome_structure/";
+	path = "/storage/home/abc6435/SzpiechLab/abc6435/KIWA_CONS/data/slim/genome_structure/";
 	chr = 1;
 	length = 114063801;
 	initializeChromosome(id=chr, length=length);
@@ -96,7 +96,7 @@ reproduction(){
 
 // RUN SIMULATION
 1 early() {
-	sim.addSubpop("p1", 4000);
+	sim.addSubpop("p1", 125000);
 }
 
 early() {
@@ -123,7 +123,7 @@ early() {
 1:1000000000 late() {
     if (sim.cycle % 1000 == 0) {
 		pi = calcPi(p1.haplosomes);
-        writeFile("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/coalesence_40K.txt",
+        writeFile("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/coalesence_125000.txt",
             sim.cycle + "," +
             pi + "," +
             sim.treeSeqCoalesced() + "," +
@@ -132,7 +132,7 @@ early() {
 	}
 
     if (sim.treeSeqCoalesced()){
-		sim.outputFull("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/burnin_40K.txt");
+		sim.outputFull("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/burnin_125000.txt");
 		sim.simulationFinished();
 	}
 }
