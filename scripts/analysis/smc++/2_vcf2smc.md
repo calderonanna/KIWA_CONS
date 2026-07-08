@@ -27,7 +27,7 @@ vcf="cKIWA_snps_bi_autosomes_DP_QUAL.vcf.gz"
 for i in `cat $scripts/autochrs.txt`; do
     singularity exec --bind $PWD:/mnt $bin/smcpp.sif \
         smc++ vcf2smc \
-        --mask $mask/${i}_mask.bed.gz \
+        #--mask $mask/${i}_mask.bed.gz \
         $snps/$vcf \
         $out/${i}.smc.gz \
         ${i} \
