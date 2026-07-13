@@ -27,7 +27,7 @@ $slim -p $scripts/burnin_31250.slim
 nano $scripts/run_burnin_62500.bash
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --mem=600GB
+#SBATCH --mem=200GB
 #SBATCH --time=300:00:00
 #SBATCH --account=zps5164_cr_default
 #SBATCH --partition=himem
@@ -42,12 +42,12 @@ slim="/storage/group/zps5164/default/bin/SLiM/build/slim"
 $slim -p $scripts/burnin_62500.slim
 ```
 
-## Burn-in 125000
+## Burn-in 12500
 ```bash
 nano $scripts/run_burnin_125000.bash
 #!/bin/bash
 #SBATCH --nodes=1
-#SBATCH --mem=600GB
+#SBATCH --mem=250GB
 #SBATCH --time=300:00:00
 #SBATCH --account=zps5164_cr_default
 #SBATCH --partition=himem

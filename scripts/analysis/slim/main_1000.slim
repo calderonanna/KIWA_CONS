@@ -1,0 +1,180 @@
+initialize() {
+	
+	// SETUP
+	initializeSLiMModelType("nonWF");
+	initializeTreeSeq(checkCoalescence=T);
+	initializeSex();
+	
+	// DEMOGRAPHICS
+	//Define burn-in end cycle
+	defineConstant("bi_end", 34164);
+	//Define Constants and Globals for Carrying Capacity
+	defineConstant("phi", 0.9);
+	defineConstant("sigma", 0.1);
+	defineGlobal("K_mean", 900);
+	defineGlobal("logK", log(K_mean));
+	defineGlobal("bot_year", c(seq(bi_end+1951,bi_end+2025, by=1)));
+	defineGlobal("K_series", c(
+		rep(432,10),rep(502,10),
+		502,201,200,216,167,179,200,219,196,210,243,232,207,215,215,216,210,167,
+		207,212,267,348,397,485,633,765,693,731,805,904,891,1085,1052,1202,1348,1418,
+		1485,1707,1803,1826,1772,1828,2090,2022,(2022+2366)/2,2366,(2366+2192)/2,2192,
+		(2192+2245)/2,(2192+2245)/2,(2192+2245)/2,2245,(2245+1522)/2,(2245+1522)/2,
+		(2245+1522)/2,1522));
+	
+	//Define Constants Life History Table (Bocetti et al. 2002)
+	mhy_mort=0.54;
+	fhy_mort=0.63;
+	mahy_mort=0.35;
+	fahy_mort=0.38;
+	defineConstant("mmort", c(mhy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,
+		mahy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,1.0));
+	defineConstant("fmort", c(fhy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,
+		fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,1.0));
+	
+	// GENETICS
+	// Discrete Deleterious DFE (SLiM5 Manual, pg.789, Kyriazis et al. 2025, and Kim et al.2017)
+	initializeMutationType("m1", 0.45, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.001); return x;"); // weak
+	initializeMutationType("m2", 0.2, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.01 | x >= -0.001); return x;"); // moderate
+	initializeMutationType("m3", 0.05, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.1 | x >= -0.01); return x;"); // strong
+	initializeMutationType("m4", 0.0, "s", "do x=rgamma(1,-0.01314833,0.186); while (x >= -0.1); return x;"); // semi-lethal
+	initializeMutationType("m5", 0.0, "f", -1.0); // lethal
+	
+	// Mutation Proportions (99.5% nonlethals, 0.5% lethal)
+	P_weak = 0.491*0.995;
+	P_moderate = 0.247*0.995;
+	P_strong = 0.236*0.995;
+	P_semilethal = 0.026*0.995;
+	P_lethal = 0.005;
+	initializeGenomicElementType("g1", c(m1,m2,m3,m4,m5), c(P_weak, P_moderate, P_strong, P_semilethal, P_lethal));
+	
+	// Import Genome Structure chr1
+	path = "~/Desktop/KIWA_CONS/data/slim/genome_structure/";
+	chr = 1;
+	length = 114063801;
+	initializeChromosome(id=chr, length=length);
+	
+	exons = readFile(path + "exon_chr" + chr + ".txt");
+	for (exon in exons) {
+		components = strsplit(exon, "\t");
+		initializeGenomicElement(g1, asInteger(components[0])-1, asInteger(components[1])-1);
+	}
+	
+	// Set Recombination Rate and Mutation Rate
+	initializeRecombinationRate(3e-8);
+	initializeMutationRate(4e-9);
+}
+
+// RUN SIMULATION
+bi_end early() {
+	sim.readFromPopulationFile("~/Desktop/KIWA_CONS/data/slim/burnin/treeseq_1000.trees");
+}
+
+early() {
+	//Sex and Age Based Individual Fitness Scaling
+	males = p1.individuals[p1.individuals.sex=="M"];
+	females = p1.individuals[p1.individuals.sex=="F"];
+	m_ages = p1.individuals[p1.individuals.sex=="M"].age;
+	f_ages = p1.individuals[p1.individuals.sex=="F"].age;
+	m_mort = mmort[m_ages];
+	f_mort = fmort[f_ages];
+	m_surv = 1-m_mort;
+	f_surv = 1-f_mort;
+	males.fitnessScaling = m_surv;
+	females.fitnessScaling = f_surv;
+	
+	//K Bottleneck Years (1950-2025 Census data)
+	decline_year = F;
+	for (i in seq(0, size(bot_year) - 1)) {
+		if (sim.cycle == bot_year[i]) {
+			K_mean = K_series[i] * 2;
+			logK = log(K_mean);
+			decline_year = T;
+			break;
+		}
+	}
+	
+	//K Future Conservation Planning
+	if (sim.cycle > (bi_end+2025)) {
+		K_mean = 4000;
+		logK = log(K_mean);
+	}
+	
+	// K Pre-Bottleneck Years
+	else if (decline_year) {
+		logK = log(K_mean);
+	}
+
+	//K-based Population Fintess Scaling (Ornstein-Uhlenbeck Discrete); (Kyriazis et al. 2021)
+	logK = (1-phi) * log(K_mean) + phi * logK + rnorm(n=1, mean=0, sd=sigma);
+	K = exp(logK);
+	p1.fitnessScaling = K/(p1.individualCount * mean(c(m_surv, f_surv)));
+	catn(paste(sim.cycle + ", K=" + K) + ", N=" + p1.individualCount);
+	
+	// Export K, N, nM, and g (Mean Generation Time)
+	repro_m = p1.individuals[p1.individuals.sex=="M" & p1.individuals.age>=1].age;
+	repro_f = p1.individuals[p1.individuals.sex=="F" & p1.individuals.age>=1].age;
+	
+	writeFile("~/Desktop/KIWA_CONS/data/slim/K_N_nM_g.txt",
+		sim.cycle + "," +
+		K + "," +
+		size(p1.individuals[p1.individuals.age >= 1]) + "," +
+		size(p1.individuals[p1.individuals.sex == "M" & p1.individuals.age >= 1]) + "," +
+		mean(c(repro_m, repro_f)) + "," +
+		"R1",
+		append=T);
+}
+
+// UPDATE SEX RATIO CHANGES (Unpublished Data)
+(bi_end+1951):(bi_end+2050) early() {
+	p1.setSexRatio(0.57);
+}
+
+(bi_end+1945):(bi_end+2050) late() {
+	// Export Mean Population Fitness
+	writeFile("~/Desktop/KIWA_CONS/data/slim/mean_fitness.txt",
+		sim.cycle + "," +
+		mean(p1.cachedFitness(NULL)) + "," +
+		"R1",
+		append=T);
+	
+	// Export Inbreeding Load (B)
+	writeFile("~/Desktop/KIWA_CONS/data/slim/inbreeding_load.txt",
+		sim.cycle + "," +
+		calcInbreedingLoad(p1.haplosomes) + "," +
+		"R1",
+		append=T);
+	
+	// Export Mutation Counts.
+	n_m1 = integer(size(p1.individuals));
+	n_m2 = integer(size(p1.individuals));
+	n_m3 = integer(size(p1.individuals));
+	n_m4 = integer(size(p1.individuals));
+	n_m5 = integer(size(p1.individuals));
+	n_m6 = integer(size(p1.individuals));
+	for (ind in seq(0,size(p1.individuals)-1)){
+		n_m1[ind] = p1.individuals[ind].countOfMutationsOfType(m1);
+		n_m2[ind] = p1.individuals[ind].countOfMutationsOfType(m2);
+		n_m3[ind] = p1.individuals[ind].countOfMutationsOfType(m3);
+		n_m4[ind] = p1.individuals[ind].countOfMutationsOfType(m4);
+		n_m5[ind] = p1.individuals[ind].countOfMutationsOfType(m5);
+		n_m6[ind] = p1.individuals[ind].countOfMutationsOfType(m6);
+	};
+	writeFile("~/Desktop/KIWA_CONS/data/slim/mutation_counts.txt",
+		sim.cycle + "," +
+		n_m1 + "," +
+		n_m2 + "," +
+		n_m3 + "," +
+		n_m4 + "," +
+		n_m5 + "," +
+		n_m6 + "," +
+		"R1",
+		append=T);
+}
+
+// End Simulation
+late (){
+	if (sim.cycle > (bi_end+2050) | p1.individualCount < 20){
+	sim.simulationFinished();
+	}
+}

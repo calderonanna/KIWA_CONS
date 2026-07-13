@@ -1,75 +1,64 @@
 initialize() {
 	
-	// DEMOGRAPHIC HISTORY
-	//Setup nonWF, Separate Sexes, and Tree Sequence Recording
+	//SETUP
+	//NonWF Model, Track Trees, Separate Sexes
 	initializeSLiMModelType("nonWF");
 	initializeTreeSeq(checkCoalescence=T);
 	initializeSex();
 	
-	//Define Constants and Globals for Carrying Capacity
-	defineGlobal("K_mean", 62500);
+	//DEMOGRAPHICS
+	//Define Constants & Globals for Carrying Capacity
 	defineConstant("phi", 0.9);
 	defineConstant("sigma", 0.1);
+    defineGlobal("K_mean", 62500);
 	defineGlobal("logK", log(K_mean));
 	
-	//Define Constants for Age-based Mortality and Define Life History Table 
-	mhy_mort=0.54;//Bocetti et al. 2002
-	fhy_mort=0.63;//Bocetti et al. 2002
-	mahy_mort=0.35;//Bocetti et al. 2002
-	fahy_mort=0.38;//Bocetti et al. 2002
+	//Define Life History Table (Bocetti et al. 2002)
+	mhy_mort=0.54;
+	fhy_mort=0.63;
+	mahy_mort=0.35;
+	fahy_mort=0.38;
 	defineConstant("mmort", c(mhy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,
 		mahy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,1.0));
 	defineConstant("fmort", c(fhy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,
 		fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,1.0));
 	
+	//GENETICS
+	// Discrete Deleterious DFE (SLiM5 Manual, pg.789, Kyriazis et al. 2025, and Kim et al.2017)
+	initializeMutationType("m1", 0.45, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.001); return x;"); // weak
+	initializeMutationType("m2", 0.2, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.01 | x >= -0.001); return x;"); // moderate
+	initializeMutationType("m3", 0.05, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.1 | x >= -0.01); return x;"); // strong
+	initializeMutationType("m4", 0.0, "s", "do x=rgamma(1,-0.01314833,0.186); while (x >= -0.1); return x;"); // semi-lethal
+	initializeMutationType("m5", 0.0, "f", -1.0); // lethal
 	
-	// GENETICS
-	// Discrete DFE (SLiM5 Manual, pg.789, Kyriazis et al. 2025, and Kim et al.2017)
-	initializeMutationType("m1", 0.5, "f", 0); // neutral 
-	initializeMutationType("m2", 0.45, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.001); return x;"); // weak
-	initializeMutationType("m3", 0.2, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.01 | x >= -0.001); return x;"); // moderate
-	initializeMutationType("m4", 0.05, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.1 | x >= -0.01); return x;"); // strong
-	initializeMutationType("m5", 0.0, "s", "do x=rgamma(1,-0.01314833,0.186); while (x >= -0.1); return x;"); // semi-lethal
-	initializeMutationType("m6", 0.0, "f", -1.0); // lethal
+	//Mutation Proportions (99.5% nonlethals, 0.5% lethal)
+	P_weak = 0.491*0.995;
+	P_moderate = 0.247*0.995;
+	P_strong = 0.236*0.995;
+	P_semilethal = 0.026*0.995;
+	P_lethal = 0.005;
+	initializeGenomicElementType("g1", c(m1,m2,m3,m4,m5), c(P_weak, P_moderate, P_strong, P_semilethal, P_lethal));
 	
-	// Mutation Proportions
-	P_neu = 0.189; // 0-fold=12564910
-	P_del = 0.811; // 4-fold=2946013
-	P_lethal = 0.005*P_del;
-	P_nonlethal = 0.995*P_del;
-	P_weak = 0.491*P_nonlethal;
-	P_moderate = 0.247*P_nonlethal;
-	P_strong = 0.236*P_nonlethal;
-	P_semilethal = 0.026*P_nonlethal;
-	
-	initializeGenomicElementType("g1", c(m1,m2,m3,m4,m5,m6), c(P_neu, P_weak, P_moderate, P_strong, P_semilethal, P_lethal));
-	initializeGenomicElementType("g2", m1, 1);
-	
-	// Import Genome Structure Chromosome 1
-	path = "/storage/home/abc6435/SzpiechLab/abc6435/KIWA_CONS/data/slim/genome_structure/";
+	//Import CHR1 Structure
+	path = "/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/genome_structure/";
 	chr = 1;
 	length = 114063801;
 	initializeChromosome(id=chr, length=length);
-
+	
 	exons = readFile(path + "exon_chr" + chr + ".txt");
 	for (exon in exons) {
 		components = strsplit(exon, "\t");
 		initializeGenomicElement(g1, asInteger(components[0])-1, asInteger(components[1])-1);
 	}
-
-	intergenics = readFile(path + "intergenic_chr" + chr + ".txt");
-	for (intergenic in intergenics) {
-		components = strsplit(intergenic, "\t");
-		initializeGenomicElement(g2, asInteger(components[0])-1, asInteger(components[1])-1);
-	}
-		
+	
+	//Set Recombination Rate & Mutation Rate
 	initializeRecombinationRate(3e-8);
 	initializeMutationRate(4e-9);
 }
 
-// REPRODUCTION
+//REPRODUCTION
 reproduction(){
-	//Age-Limited Reproduction and Age-Related Pairing Success (Jukkala 2022)
+	//Age-Limited Reproduction & Age-Related Pairing Success (Jukkala 2022)
 	f = p1.individuals[p1.individuals.sex == "F" & p1.individuals.age >= 1];
 	asym = (p1.individuals[p1.individuals.sex == "M" & p1.individuals.age >= 2]);
 	sym = (p1.individuals[p1.individuals.sex == "M" & p1.individuals.age == 1]);
@@ -94,7 +83,7 @@ reproduction(){
 	self.active = 0;
 }
 
-// RUN SIMULATION
+//RUN SIMULATION
 1 early() {
 	sim.addSubpop("p1", 62500);
 }
@@ -117,22 +106,24 @@ early() {
 	K = exp(logK);
 	p1.fitnessScaling = K/(p1.individualCount * mean(c(m_surv, f_surv)));
 	catn(paste(sim.cycle + ", K=" + K));
+
+	//End Sim When Coal=T, Output Sim, Output Trees, Output Burn-in End Cycle.
+	if (sim.treeSeqCoalesced()){
+		sim.outputFull("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/burnin_62500.txt");
+		sim.treeSeqOutput("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/treeseq_62500.trees");
+		writeFile("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/bi_end_62500.txt", asString(sim.cycle));
+		sim.simulationFinished();
+	}
 }
 
-// Export Genomewide Neutral Genetic Diversity and Coalesence State
+//Export Pi & Coalescence State. 
 1:1000000000 late() {
-    if (sim.cycle % 1000 == 0) {
+	if (sim.cycle % 1000 == 0) {
 		pi = calcPi(p1.haplosomes);
-        writeFile("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/coalesence_62500.txt",
-            sim.cycle + "," +
-            pi + "," +
-            sim.treeSeqCoalesced() + "," +
-            "R1",
-            append=T);
-	}
-
-    if (sim.treeSeqCoalesced()){
-		sim.outputFull("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/burnin_62500.txt");
-		sim.simulationFinished();
+		writeFile("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/coal_62500.txt",
+			sim.cycle + "," +
+			pi + "," +
+			sim.treeSeqCoalesced(),
+			append=T);
 	}
 }
