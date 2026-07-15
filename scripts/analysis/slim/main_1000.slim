@@ -182,7 +182,7 @@ early() {
 late (){
 
 	//End Sim After Year 2050 Or If Extinction Occurs. Output Final Trees. 
-	if (sim.cycle > (bi_end+2050) | p1.individualCount < 20){
+	if (sim.cycle > (bi_end+2050) | p1.individualCount < 600){
 		sim.treeSeqOutput("~/Desktop/treeseqfinal_1000.trees");
 		sim.simulationFinished();
 	}
