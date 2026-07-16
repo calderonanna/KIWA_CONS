@@ -66,6 +66,33 @@ initialize() {
 	initializeMutationRate(4e-9);
 }
 
+//REPRODUCTION
+reproduction(){
+	//Age-Limited Reproduction & Age-Related Pairing Success (Jukkala 2022, pg.36)
+	f = p1.individuals[p1.individuals.sex == "F" & p1.individuals.age >= 1];
+	asym = (p1.individuals[p1.individuals.sex == "M" & p1.individuals.age >= 2]);
+	sym = (p1.individuals[p1.individuals.sex == "M" & p1.individuals.age == 1]);
+	asym_breeders = sample(asym, asInteger(round(size(asym) * 0.994)));
+	sym_breeders = sample(sym, asInteger(round(size(sym) * 0.86)));
+	m = c(asym_breeders, sym_breeders);
+	
+	//Assortative-Age Pairing (Jukkala 2022)
+	shuf_f = sample(f, size(f), replace=F);
+	shuf_m = sample(m, size(m), replace=T);
+	n = min(size(shuf_f), size(shuf_m));
+	
+	//Fledglings Per Monogomous Pair
+	for (i in seq(0, n - 1))
+	{
+		baseline_fledglings = max(0,asInteger(round(rnorm(n = 1, mean = 3.3, sd = 0.16))));
+		mom = shuf_f[i];
+		dad = shuf_m[i];
+		p1.addCrossed(mom, dad, count = baseline_fledglings);
+	}
+	
+	self.active = 0;
+}
+
 //RUN SIMULATION
 bi_end early() {
 
