@@ -1,8 +1,9 @@
 initialize() {
 	
 	//SETUP
-	//NonWF Model with Separate Sexes
+	//NonWF Model, Track Trees, Separate Sexes
 	initializeSLiMModelType("nonWF");
+	initializeTreeSeq(checkCoalescence=T);
 	initializeSex();
 	
 	//DEMOGRAPHICS
@@ -38,7 +39,7 @@ initialize() {
 	P_lethal = 0.005;
 	initializeGenomicElementType("g1", c(m1,m2,m3,m4,m5), c(P_weak, P_moderate, P_strong, P_semilethal, P_lethal));
 	
-	//Import Chr1 Structure
+	//Import CHR1 Structure
 	path = "/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/genome_structure/";
 	chr = 1;
 	length = 114063801;
@@ -57,13 +58,15 @@ initialize() {
 
 //REPRODUCTION
 reproduction(){
-	//Age-Limited Reproduction & Age-Related Pairing Success (Jukkala 2022, pg.36)
+	//Age-Limited Reproduction & Age-Related Pairing Success (Jukkala 2022)
 	f = p1.individuals[p1.individuals.sex == "F" & p1.individuals.age >= 1];
 	asym = (p1.individuals[p1.individuals.sex == "M" & p1.individuals.age >= 2]);
 	sym = (p1.individuals[p1.individuals.sex == "M" & p1.individuals.age == 1]);
 	asym_breeders = sample(asym, asInteger(round(size(asym) * 0.994)));
 	sym_breeders = sample(sym, asInteger(round(size(sym) * 0.86)));
 	m = c(asym_breeders, sym_breeders);
+	
+	//Assortative-Age Pairing (Jukkala 2022)
 	shuf_f = sample(f, size(f), replace=F);
 	shuf_m = sample(m, size(m), replace=T);
 	n = min(size(shuf_f), size(shuf_m));
@@ -102,55 +105,25 @@ early() {
 	logK = (1-phi) * log(K_mean) + phi * logK + rnorm(n=1, mean=0, sd=sigma);
 	K = exp(logK);
 	p1.fitnessScaling = K/(p1.individualCount * mean(c(m_surv, f_surv)));
-}
+	catn(paste(sim.cycle + ", K=" + K));
 
-//EXPORT DATA
-1:300000 late() {
-	if (sim.cycle % 1000 == 0) {
-	
-		//Generation Times
-		repro_m = p1.individuals[p1.individuals.sex=="M" & p1.individuals.age>=1].age;
-		repro_f = p1.individuals[p1.individuals.sex=="F" & p1.individuals.age>=1].age;
-
-		//Mutation Counts
-		n_m1 = integer(size(p1.individuals));
-		n_m2 = integer(size(p1.individuals));
-		n_m3 = integer(size(p1.individuals));
-		n_m4 = integer(size(p1.individuals));
-		n_m5 = integer(size(p1.individuals));
-		
-		for (ind in seq(0,size(p1.individuals)-1)){
-			n_m1[ind] = p1.individuals[ind].countOfMutationsOfType(m1);
-			n_m2[ind] = p1.individuals[ind].countOfMutationsOfType(m2);
-			n_m3[ind] = p1.individuals[ind].countOfMutationsOfType(m3);
-			n_m4[ind] = p1.individuals[ind].countOfMutationsOfType(m4);
-			n_m5[ind] = p1.individuals[ind].countOfMutationsOfType(m5);
-		}
-
-	writeFile("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/burnin_31250_results.txt",
-		sim.cycle + "," +
-		size(p1.individuals) + "," +
-		size(p1.individuals[p1.individuals.sex == "M" & p1.individuals.age >= 1]) + "," +
-		size(p1.individuals[p1.individuals.sex == "F" & p1.individuals.age >= 1]) + "," +
-		mean(c(repro_m, repro_f)) + "," +
-		calcPi(p1.haplosomes) + "," +
-		mean(p1.cachedFitness(NULL)) + "," +
-		calcMeanFroh(p1.individuals) + "," +
-		calcInbreedingLoad(p1.haplosomes) + "," +
-		calcHeterozygosity(p1.haplosomes)+ "," +
-		mean(n_m1) + "," +
-		mean(n_m2) + "," +
-		mean(n_m3) + "," +
-		mean(n_m4) + "," +
-		mean(n_m5),
-		append=T);
+	//End Sim When Coal=T, Output Sim, Output Trees, Output Burn-in End Cycle.
+	if (sim.treeSeqCoalesced()){
+		sim.outputFull("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/burnin_31250.txt");
+		sim.treeSeqOutput("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/treeseq_31250.trees");
+		writeFile("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/bi_end_31250.txt", asString(sim.cycle));
+		sim.simulationFinished();
 	}
 }
 
-//End at 300K cycles and Output Full Simulation
-late() {
-	if (sim.cycle == 300000) {
-		sim.outputFull("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/burnin_31250.txt");
-		sim.simulationFinished();
+//Export Pi & Coalescence State. 
+1:1000000000 late() {
+	if (sim.cycle % 1000 == 0) {
+		pi = calcPi(p1.haplosomes);
+		writeFile("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/coal_31250.txt",
+			sim.cycle + "," +
+			pi + "," +
+			sim.treeSeqCoalesced(),
+			append=T);
 	}
 }

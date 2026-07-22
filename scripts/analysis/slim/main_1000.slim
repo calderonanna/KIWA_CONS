@@ -2,12 +2,11 @@ initialize() {
 	
 	//SETUP
 	initializeSLiMModelType("nonWF");
-	initializeTreeSeq(checkCoalescence=T);
 	initializeSex();
 	
 	//DEMOGRAPHICS
 	//Define burn-in end cycle
-	defineConstant("bi_end", 34164);
+	defineConstant("bi_end", 500);
 	
 	//Define Constants and Globals for Carrying Capacity
 	defineConstant("phi", 0.9);
@@ -49,7 +48,7 @@ initialize() {
 	P_lethal = 0.005;
 	initializeGenomicElementType("g1", c(m1,m2,m3,m4,m5), c(P_weak, P_moderate, P_strong, P_semilethal, P_lethal));
 	
-	//Import Genome Structure chr1
+	//Import Chr1 Structure
 	path = "~/Desktop/KIWA_CONS/data/slim/genome_structure/";
 	chr = 1;
 	length = 114063801;
@@ -75,13 +74,11 @@ reproduction(){
 	asym_breeders = sample(asym, asInteger(round(size(asym) * 0.994)));
 	sym_breeders = sample(sym, asInteger(round(size(sym) * 0.86)));
 	m = c(asym_breeders, sym_breeders);
-	
-	//Assortative-Age Pairing (Jukkala 2022)
 	shuf_f = sample(f, size(f), replace=F);
 	shuf_m = sample(m, size(m), replace=T);
 	n = min(size(shuf_f), size(shuf_m));
 	
-	//Fledglings Per Monogomous Pair
+	//Fledglings Per Pair
 	for (i in seq(0, n - 1))
 	{
 		baseline_fledglings = max(0,asInteger(round(rnorm(n = 1, mean = 3.3, sd = 0.16))));
@@ -93,15 +90,14 @@ reproduction(){
 	self.active = 0;
 }
 
-//RUN SIMULATION
+//IMPORT BURN-IN
 bi_end early() {
-
-	//Import Burn-In Trees
-	sim.readFromPopulationFile("~/Desktop/treeseq_1000.trees");
+	sim.readFromPopulationFile("~/Desktop/burnin_31250.txt");
 }
 
+//RUN SIMULAION
 early() {
-
+	
 	//Sex and Age Based Individual Fitness Scaling
 	males = p1.individuals[p1.individuals.sex=="M"];
 	females = p1.individuals[p1.individuals.sex=="F"];
@@ -126,7 +122,7 @@ early() {
 	}
 	
 	//K Future Conservation Planning
-	if (sim.cycle > (bi_end+2025)) {
+	if (sim.cycle > (bi_end+2500)) {
 		K_mean = 4000;
 		logK = log(K_mean);
 	}
@@ -140,67 +136,45 @@ early() {
 	logK = (1-phi) * log(K_mean) + phi * logK + rnorm(n=1, mean=0, sd=sigma);
 	K = exp(logK);
 	p1.fitnessScaling = K/(p1.individualCount * mean(c(m_surv, f_surv)));
-	catn(paste(sim.cycle + ", K=" + K) + ", N=" + p1.individualCount);
-	
-	//Export K, N, nM, and g (Mean Generation Time)
+}
+
+//EXPORT DATA
+(bi_end+1900):(bi_end+2500) late() {
+
+	//Generation Times
 	repro_m = p1.individuals[p1.individuals.sex=="M" & p1.individuals.age>=1].age;
 	repro_f = p1.individuals[p1.individuals.sex=="F" & p1.individuals.age>=1].age;
-	writeFile("~/Desktop/K_N_nM_g.txt",
-		sim.cycle + "," +
-		K + "," +
-		size(p1.individuals[p1.individuals.age >= 1]) + "," +
-		size(p1.individuals[p1.individuals.sex == "M" & p1.individuals.age >= 1]) + "," +
-		mean(c(repro_m, repro_f)) + "," +
-		"R1",
-		append=T);
-}
 
-
-(bi_end+1951):(bi_end+2050) early() {
-
-	//Update Sex Ratio (Unpublished Data)
-	p1.setSexRatio(0.57);
-}
-
-(bi_end+1945):(bi_end+2050) late() {
-
-	//Export Mean Population Fitness
-	writeFile("~/Desktop/mean_fitness.txt",
-		sim.cycle + "," +
-		mean(p1.cachedFitness(NULL)) + "," +
-		"R1",
-		append=T);
-	
-	//Export Inbreeding Load (B)
-	writeFile("~/Desktop/inbreeding_load.txt",
-		sim.cycle + "," +
-		calcInbreedingLoad(p1.haplosomes) + "," +
-		"R1",
-		append=T);
-	
-	//Export Mutation Counts.
+	//Mutation Counts
 	n_m1 = integer(size(p1.individuals));
 	n_m2 = integer(size(p1.individuals));
 	n_m3 = integer(size(p1.individuals));
 	n_m4 = integer(size(p1.individuals));
 	n_m5 = integer(size(p1.individuals));
-	n_m6 = integer(size(p1.individuals));
 	for (ind in seq(0,size(p1.individuals)-1)){
 		n_m1[ind] = p1.individuals[ind].countOfMutationsOfType(m1);
 		n_m2[ind] = p1.individuals[ind].countOfMutationsOfType(m2);
 		n_m3[ind] = p1.individuals[ind].countOfMutationsOfType(m3);
 		n_m4[ind] = p1.individuals[ind].countOfMutationsOfType(m4);
 		n_m5[ind] = p1.individuals[ind].countOfMutationsOfType(m5);
-		n_m6[ind] = p1.individuals[ind].countOfMutationsOfType(m6);
 	};
-	writeFile("~/Desktop/mutation_counts.txt",
+
+	writeFile("~/Desktop/main_31250_results.txt",
 		sim.cycle + "," +
-		n_m1 + "," +
-		n_m2 + "," +
-		n_m3 + "," +
-		n_m4 + "," +
-		n_m5 + "," +
-		n_m6 + "," +
+		size(p1.individuals) + "," +
+		size(p1.individuals[p1.individuals.sex == "M" & p1.individuals.age >= 1]) + "," +
+		size(p1.individuals[p1.individuals.sex == "F" & p1.individuals.age >= 1]) + "," +
+		mean(c(repro_m, repro_f)) + "," +
+		calcPi(p1.haplosomes) + "," +
+		mean(p1.cachedFitness(NULL)) + "," +
+		calcMeanFroh(p1.individuals) + "," +
+		calcInbreedingLoad(p1.haplosomes) + "," +
+		calcHeterozygosity(p1.haplosomes)+ "," +
+		mean(n_m1) + "," +
+		mean(n_m2) + "," +
+		mean(n_m3) + "," +
+		mean(n_m4) + "," +
+		mean(n_m5) + "," +
 		"R1",
 		append=T);
 }
@@ -208,9 +182,8 @@ early() {
 //END SIMULATION
 late (){
 
-	//End Sim After Year 2050 Or If Extinction Occurs. Output Final Trees. 
-	if (sim.cycle > (bi_end+2050) | p1.individualCount < 600){
-		sim.treeSeqOutput("~/Desktop/treeseqfinal_1000.trees");
+	//End Sim After Year 2500 Or If Extinction Occurs.
+	if (sim.cycle > (bi_end+2500) | p1.individualCount < 2){
 		sim.simulationFinished();
 	}
 }
