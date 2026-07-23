@@ -8,7 +8,7 @@ This block sets up a non Wright Fisher Model and enables separate sex along with
 ![alt text](<../../../../diagrams/Screenshot 2026-07-23 at 1.40.24 PM.png>)
 - `sim_end`: Defines the cycle at which to end the simulation
 - `R`: Replicate number
-- `Ka`: The ancestral K {31250, 62500, 125000}
+- `Ka`: The ancestral $K\ \epsilon\{31250, 62500, 125000\}$
 
 ```c
 //SETUP
