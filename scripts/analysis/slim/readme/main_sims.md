@@ -29,16 +29,23 @@ Defines the demographic attributes of this population based on census data of si
 
 - `phi`: The degree of autocorrelation for the OU Process
 - `sigma`: The variation in environmental change
--`K_mean`-: The average K which the OU will pull the long-term K of ~9924
+- `K_mean`: The average K which the OU will pull the long-term K of ~9924
 - `logK`: The natural log of K_mean
 - `census_year`: Time frame when formal census counts took place.
 - `K_series`: Defined as the estimated population size during bottleneck years and calculated from census surveys of singing males as:
- $$
- K_{i} =\sum _{i=1}^{2025} SingingMales_{i} \ +\ \frac{SingingMales_{i}}{SexRatio} \ +\ \frac{SingingMales_{i} \ +\frac{SingingMales_{i}}{SexRatio}}{AgeRatio}\\
- $$
- Where $SexRatio=1.37$ is an emergent property resulting from skewed sex-based mortality, but also empirically supported in Meyers 2010 (https://research.fs.usda.gov/feis/species-reviews/seki)
 
- and $AgeRatio\epsilon\{1.15, 3.5\}$ are two emergent properties resulting from each having 3.3 fledglings (citation) without cowbird parasitism and 1 fledgling with cowbird parasitism (Kelly and DeCapita 1982)
+ $$
+K_t = AHYm_t + AHYf_t + HY_t \quad \forall t \in [1951,2025]
+ $$
+
+ Where:
+ - $AHYm_t$ : Number of singing males.
+ - $AHYf_t = \frac{AHYm_t}{SexRatio}$
+ - $HY_t = \frac{AHYm_t + AHYf_t}{AgeRatio}$
+
+- $SexRatio=1.37$ : an emergent property resulting from skewed sex-based mortality, but also empirically supported in Meyers 2010 (https://research.fs.usda.gov/feis/species-reviews/seki)
+
+ - $AgeRatio\ \epsilon\ \{1.15, 3.5\}$ : emergent properties resulting from each having 3.3 fledglings (citation) without cowbird parasitism and 1 fledgling with cowbird parasitism (Kelly and DeCapita 1982)
 
  - `*_mort`: Sex and age-based mortality probabilities (Bocetti et al. 2002), which are used to create a life history table for each sex with a maximum age of 12 years. 
 
@@ -155,7 +162,7 @@ reproduction(){
 }
 ```
 ## IMPORT BURN-IN
-This simply takes the burn-in full simulation output and imports it so that the main simulation can pick up where the burn-in ended. I have three different burn-ins which differ by ancestral carrying capacity: $K_a\epsilon\{31250, 62500, 125000\}$
+This simply takes the burn-in full simulation output and imports it so that the main simulation can pick up where the burn-in ended. I have three different burn-ins which differ by ancestral carrying capacity: $K_a\ \epsilon\{31250, 62500, 125000\}$
 ```c
 bi_end early() {
 	sim.readFromPopulationFile("~/Desktop/burnin_31250.txt");
@@ -163,19 +170,19 @@ bi_end early() {
 ```
 
 ## RUN SIMULATION
-**Sex and Age Based Individual Fitness Scaling**
+- **Sex and Age Based Individual Fitness Scaling**: 
 Individual fitnesses are scaled based on their sex and age which have different mortality rates
 
-**K Bottleneck Years (1951-2025 Census data)**
+- **K Bottleneck Years (1951-2025 Census data)**: 
 This section adjusts the carrying capacity which is based on formal census surveys of singing males and adjusted to include adult females and hatch-year birds. See `DEMOGRAHICS` for specifics.  
 
-**K Future Conservation Planning**
+- **K Future Conservation Planning**: 
 This section implements future conservation management from 2025 until the end of the simulation (`sim_end`). `K_cons` will be one of four different conservation scenario; see `SETUP` section for specifics.
 
-**K Pre-Bottleneck Years**
+- **K Pre-Bottleneck Years**: 
 After the burn-in but before the bottleneck (`bi_end`-`bi_end+1950`), I assume a constant mean carrying capacity of 9924. This block is just saying that if it is not a decline year, then  K_mean = 9924
 
-**K-based Population Fintess Scaling (Ornstein-Uhlenbeck Discrete); (Kyriazis et al. 2021)**
+- **K-based Population Fintess Scaling (Ornstein-Uhlenbeck Discrete); (Kyriazis et al. 2021)**: 
 Like Kyriazis et al. 2021, I implement a fluctuating carrying capacity. The Ornstein-Uhlenbeck process describes a mean-reverting process.
 
 $$
@@ -184,14 +191,9 @@ $$
 $$
 where;\ \phi=0.9,\ \epsilon=rnorm(n=1,\mu=0,\sigma=0.1)
 $$
-
 - $logK_{mean}(1-\phi)$: is the degree of autocorrelation, that is retains a portion ($1-\phi$ or 10%) of the previous value. 
 - $\phi logK$: is the mean reverting component. So it retains $\phi$ or 90% of the long term mean (so 90% of 9924)
 - $\epsilon$: is the degree of environmental stochasticity, which is determined by a standard deviation, $\sigma$.
-
-
-
-
 ```c
 //RUN SIMULAION
 early() {
