@@ -33,7 +33,7 @@ nano $scripts/run_burnin_62500.bash
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
 #SBATCH --time=300:00:00
-#SBATCH --account=dut374_sc_default
+#SBATCH --account=dut374_hc_default
 #SBATCH --job-name=run_burnin_62500
 #SBATCH --error=/storage/group/zps5164/default/abc6435/KIWA_CONS/err_out/%x.%j.out
 
@@ -56,7 +56,7 @@ nano $scripts/run_burnin_125000.bash
 #SBATCH --nodes=1
 #SBATCH --mem=100GB
 #SBATCH --time=300:00:00
-#SBATCH --account=dut374_sc_default
+#SBATCH --account=dut374_hc_default
 #SBATCH --job-name=run_burnin_125000
 #SBATCH --error=/storage/group/zps5164/default/abc6435/KIWA_CONS/err_out/%x.%j.out
 

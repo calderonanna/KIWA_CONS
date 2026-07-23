@@ -1,0 +1,85 @@
+---
+title: "burn_in"
+output: html_document
+date: "2026-07-22"
+---
+
+# Download Data
+
+```{bash}
+rsync abc6435@submit.hpc.psu.edu:/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/burnin_31250_results.txt ~/Desktop
+```
+
+# Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+library(tidyverse)
+
+```
+
+# Import Data and Modify
+
+```{r import_data, include=FALSE}
+setwd("~/Desktop")
+BI_31250 <- read.csv("burnin_31250_results.txt")
+BI_31250$Nhy <- (BI_31250$N-(BI_31250$Nm+BI_31250$Nf))
+BI_31250$B2 <- (BI_31250$B)*2
+
+#Demography
+BI_31250_dem <- BI_31250 %>%
+  select(cycle, N, Nm, Nf, Nhy) %>%
+  melt(id = "cycle") %>%
+  mutate(variable = recode(variable,
+                           N="Nc",
+                           Nm="AHY Males",
+                           Nf="AHY Females",
+                           Nhy="HY"))
+
+#Genetics
+BI_31250_gen <- BI_31250 %>%
+  select(cycle, mean_fitness, mean_froh, B2, het) %>%
+  melt(id = "cycle") %>%
+  mutate(variable = recode(variable,
+                           mean_fitness="Fitness",
+                           mean_froh="FROH",
+                           B2="Inbreeding Load",
+                           het="Heterozygosity"))
+```
+
+# Plot
+
+```{r plot, include=FALSE}
+
+#Demography
+ggplot(BI_31250_dem, aes(x=cycle, y=value, color=variable)) + 
+  geom_line(linewidth=0.75) +
+  scale_color_manual(values=c("black", "#0F7D8C", "#8C0F6F","#E6B400")) +
+  scale_x_continuous(expand=c(0,0)) +
+  scale_y_continuous(expand=c(0,0), breaks=seq(0,max(BI_31250_dem$value), by=5000)) +
+  ylab("count") +
+  theme(
+    panel.background = element_blank(),
+    panel.border = element_rect(color="black", fill=NA),
+    legend.title = element_blank(),
+    legend.key = element_blank()
+  )
+
+#Genetics
+ggplot(BI_31250_gen, aes(x=cycle, y=value)) + 
+  geom_line(linewidth=0.75, color="black") +
+  facet_wrap(~variable, ncol=1, nrow=4, scales="free_y", strip.position = "right") +
+  #scale_color_manual(values=c("#BDE05E", "#00FFB7", "#00E6FF","#006AFF")) +
+  scale_x_continuous(expand=c(0,0), breaks = seq(0,300000, by =25000)) +
+  labs(y=NULL) +
+  theme(
+    strip.background = element_blank(),
+    panel.background = element_blank(),
+    panel.border = element_rect(color="black", fill=NA),
+    legend.position = "none"
+  )
+
+```
