@@ -88,23 +88,28 @@ defineGlobal("K_series", c(
 Samples mutations from a gamma distribution estimated from human data by Kim et al. 2017. Further `initializeMutationType()` uses an hs mixture model where weakly deleterious mutations are additive and become more recessive with decreasing selection coefficients; this hs relationship was directly obtained from Kyriazis et al. 2025. Mutation Proportion were obtained by taking the area under the curve from the gamma distribution and then augmented with 99.5% non-lethal mutations and 0.05% lethal mutations as in Kyriazis et al. 2025. Notice that I am not simulating neutral mutations to reduced computation overhead. Last, I simulate a single chromosome based on our reference genome and import exonic regions based on our reference annotations. This chromosome recombines at a rate of 3e-8 per site per generation (citation) and has a mutation rate of 4e-9 (citation)
 ```c
 	//GENETICS
-	//Discrete Deleterious DFE (SLiM5 Manual, pg.789, Kyriazis et al. 2025, and Kim et al.2017)
-	initializeMutationType("m1", 0.45, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.001); return x;"); //weak
-	initializeMutationType("m2", 0.2, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.01 | x >= -0.001); return x;"); //moderate
-	initializeMutationType("m3", 0.05, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.1 | x >= -0.01); return x;"); //strong
-	initializeMutationType("m4", 0.0, "s", "do x=rgamma(1,-0.01314833,0.186); while (x >= -0.1); return x;"); // semi-lethal
-	initializeMutationType("m5", 0.0, "f", -1.0); //lethal
+	// Discrete Deleterious DFE (SLiM5 Manual, pg.789, Kyriazis et al. 2025, and Kim et al.2017)
+	initializeMutationType("m1", 0.5, "f", 0); // neutral 
+	initializeMutationType("m2", 0.45, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.001); return x;"); // weak
+	initializeMutationType("m3", 0.2, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.01 | x >= -0.001); return x;"); // moderate
+	initializeMutationType("m4", 0.05, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.1 | x >= -0.01); return x;"); // strong
+	initializeMutationType("m5", 0.0, "s", "do x=rgamma(1,-0.01314833,0.186); while (x >= -0.1); return x;"); // semi-lethal
+	initializeMutationType("m6", 0.0, "f", -1.0); // lethal
 	
 	//Mutation Proportions (99.5% nonlethals, 0.5% lethal)
-	P_weak = 0.491*0.995;
-	P_moderate = 0.247*0.995;
-	P_strong = 0.236*0.995;
-	P_semilethal = 0.026*0.995;
-	P_lethal = 0.005;
-	initializeGenomicElementType("g1", c(m1,m2,m3,m4,m5), c(P_weak, P_moderate, P_strong, P_semilethal, P_lethal));
+	P_neu = 0.189; // 0-fold=12564910
+	P_del = 0.811; // 4-fold=2946013
+	P_nonlethal = 0.995*P_del;
+	P_lethal = 0.005*P_del;
+	P_semilethal = 0.026*P_nonlethal;
+	P_strong = 0.236*P_nonlethal;
+	P_moderate = 0.247*P_nonlethal;
+	P_weak = 0.491*P_nonlethal;
+	initializeGenomicElementType("g1", c(m1,m2,m3,m4,m5,m6), c(P_neu, P_weak, P_moderate, P_strong, P_semilethal, P_lethal));
+	initializeGenomicElementType("g2", m1, 1);
 
-    //Import Chr1 Structure
-	path = "~/Desktop/KIWA_CONS/data/slim/genome_structure/";
+	//Import Chr1 Structure
+	path = "/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/genome_structure/";
 	chr = 1;
 	length = 114063801;
 	initializeChromosome(id=chr, length=length);
@@ -114,10 +119,17 @@ Samples mutations from a gamma distribution estimated from human data by Kim et 
 		components = strsplit(exon, "\t");
 		initializeGenomicElement(g1, asInteger(components[0])-1, asInteger(components[1])-1);
 	}
+
+	intergenics = readFile(path + "intergenic_chr" + chr + ".txt");
+	for (intergenic in intergenics) {
+		components = strsplit(intergenic, "\t");
+		initializeGenomicElement(g2, asInteger(components[0])-1, asInteger(components[1])-1);
+	}
 	
-	//Set Recombination Rate and Mutation Rate
+	//Set Recombination Rate & Mutation Rate
 	initializeRecombinationRate(3e-8);
 	initializeMutationRate(4e-9);
+
 ```
 ## REPRODUCTION
 **Age-Limited Reproduction & Age-Related Pairing Success**
@@ -191,8 +203,8 @@ $$
 $$
 where;\ \phi=0.9,\ \epsilon=rnorm(n=1,\mu=0,\sigma=0.1)
 $$
-- $logK_{mean}(1-\phi)$: is the degree of autocorrelation, that is retains a portion ($1-\phi$ or 10%) of the previous value. 
-- $\phi logK$: is the mean reverting component. So it retains $\phi$ or 90% of the long term mean (so 90% of 9924)
+- $logK_{mean}(1-\phi)$: is the mean-reverting component, that is retains a portion ($1-\phi$ or 10%) of the long-term mean. 
+- $\phi logK$: is the degree of autocorrelation. So it retains $\phi$ or 90% of the previous year's value. 
 - $\epsilon$: is the degree of environmental stochasticity, which is determined by a standard deviation, $\sigma$.
 ```c
 //RUN SIMULAION
@@ -289,7 +301,7 @@ Instructs the simulation to end at a specific cycle OR if the population goes ex
 //END SIMULATION
 late (){
 	
-	//End Sim After Year 2500 Or If Extinction Occurs.
+	//End Sim After Year 2100 Or If Extinction Occurs.
 	if (sim.cycle > (bi_end+sim_end) | p1.individualCount < 10){
 		sim.simulationFinished();
 	}

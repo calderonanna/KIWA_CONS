@@ -1,0 +1,167 @@
+initialize() {
+	
+	//SETUP
+	//NonWF Model with Separate Sexes
+	initializeSLiMModelType("nonWF");
+	initializeSex();
+	
+	//DEMOGRAPHICS
+	//Define Constants & Globals for Carrying Capacity
+	defineConstant("phi", 0.9);
+	defineConstant("sigma", 0.1);
+	defineGlobal("K_mean", 62500);
+	defineGlobal("logK", log(K_mean));
+	
+	//Define Life History Table (Bocetti et al. 2002)
+	mhy_mort=0.54;
+	fhy_mort=0.63;
+	mahy_mort=0.35;
+	fahy_mort=0.38;
+	defineConstant("mmort", c(mhy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,
+		mahy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,mahy_mort,1.0));
+	defineConstant("fmort", c(fhy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,
+		fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,1.0));
+	
+	//GENETICS
+	// Discrete Deleterious DFE (SLiM5 Manual, pg.789, Kyriazis et al. 2025, and Kim et al.2017)
+	initializeMutationType("m1", 0.5, "f", 0); // neutral 
+	initializeMutationType("m2", 0.45, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.001); return x;"); // weak
+	initializeMutationType("m3", 0.2, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.01 | x >= -0.001); return x;"); // moderate
+	initializeMutationType("m4", 0.05, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.1 | x >= -0.01); return x;"); // strong
+	initializeMutationType("m5", 0.0, "s", "do x=rgamma(1,-0.01314833,0.186); while (x >= -0.1); return x;"); // semi-lethal
+	initializeMutationType("m6", 0.0, "f", -1.0); // lethal
+	
+	//Mutation Proportions (99.5% nonlethals, 0.5% lethal)
+	P_neu = 0.189; // 0-fold=12564910
+	P_del = 0.811; // 4-fold=2946013
+	P_nonlethal = 0.995*P_del;
+	P_lethal = 0.005*P_del;
+	P_semilethal = 0.026*P_nonlethal;
+	P_strong = 0.236*P_nonlethal;
+	P_moderate = 0.247*P_nonlethal;
+	P_weak = 0.491*P_nonlethal;
+	initializeGenomicElementType("g1", c(m1,m2,m3,m4,m5,m6), c(P_neu, P_weak, P_moderate, P_strong, P_semilethal, P_lethal));
+	initializeGenomicElementType("g2", m1, 1);
+
+	//Import Chr1 Structure
+	path = "/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/genome_structure/";
+	chr = 1;
+	length = 114063801;
+	initializeChromosome(id=chr, length=length);
+	
+	exons = readFile(path + "exon_chr" + chr + ".txt");
+	for (exon in exons) {
+		components = strsplit(exon, "\t");
+		initializeGenomicElement(g1, asInteger(components[0])-1, asInteger(components[1])-1);
+	}
+
+	intergenics = readFile(path + "intergenic_chr" + chr + ".txt");
+	for (intergenic in intergenics) {
+		components = strsplit(intergenic, "\t");
+		initializeGenomicElement(g2, asInteger(components[0])-1, asInteger(components[1])-1);
+	}
+	
+	//Set Recombination Rate & Mutation Rate
+	initializeRecombinationRate(3e-8);
+	initializeMutationRate(4e-9);
+}
+
+//REPRODUCTION
+reproduction(){
+	//Age-Limited Reproduction & Age-Related Pairing Success (Jukkala 2022, pg.36)
+	f = p1.individuals[p1.individuals.sex == "F" & p1.individuals.age >= 1];
+	asym = (p1.individuals[p1.individuals.sex == "M" & p1.individuals.age >= 2]);
+	sym = (p1.individuals[p1.individuals.sex == "M" & p1.individuals.age == 1]);
+	asym_breeders = sample(asym, asInteger(round(size(asym) * 0.994)));
+	sym_breeders = sample(sym, asInteger(round(size(sym) * 0.86)));
+	m = c(asym_breeders, sym_breeders);
+	shuf_f = sample(f, size(f), replace=F);
+	shuf_m = sample(m, size(m), replace=T);
+	n = min(size(shuf_f), size(shuf_m));
+	
+	//Fledglings Per Monogomous Pair
+	for (i in seq(0, n - 1))
+	{
+		baseline_fledglings = max(0,asInteger(round(rnorm(n = 1, mean = 3.3, sd = 0.16))));
+		mom = shuf_f[i];
+		dad = shuf_m[i];
+		p1.addCrossed(mom, dad, count = baseline_fledglings);
+	}
+	
+	self.active = 0;
+}
+
+//RUN SIMULATION
+1 early() {
+	sim.addSubpop("p1", 62500);
+}
+
+early() {
+	//Sex and Age Based Individual Fitness Scaling
+	males = p1.individuals[p1.individuals.sex=="M"];
+	females = p1.individuals[p1.individuals.sex=="F"];
+	m_ages = p1.individuals[p1.individuals.sex=="M"].age;
+	f_ages = p1.individuals[p1.individuals.sex=="F"].age;
+	m_mort = mmort[m_ages];
+	f_mort = fmort[f_ages];
+	m_surv = 1-m_mort;
+	f_surv = 1-f_mort;
+	males.fitnessScaling = m_surv;
+	females.fitnessScaling = f_surv;
+	
+	//K-based Population Fintess Scaling (Ornstein-Uhlenbeck Discrete); (Kyriazis et al. 2021)
+	logK = (1-phi) * log(K_mean) + phi * logK + rnorm(n=1, mean=0, sd=sigma);
+	K = exp(logK);
+	p1.fitnessScaling = K/(p1.individualCount * mean(c(m_surv, f_surv)));
+}
+
+//EXPORT DATA
+1:300000 late() {
+	if (sim.cycle % 1000 == 0) {
+	
+		//Generation Times
+		repro_m = p1.individuals[p1.individuals.sex=="M" & p1.individuals.age>=1].age;
+		repro_f = p1.individuals[p1.individuals.sex=="F" & p1.individuals.age>=1].age;
+
+		//Mutation Counts
+		n_m2 = integer(size(p1.individuals));
+		n_m3 = integer(size(p1.individuals));
+		n_m4 = integer(size(p1.individuals));
+		n_m5 = integer(size(p1.individuals));
+		n_m6 = integer(size(p1.individuals));
+		
+		for (ind in seq(0,size(p1.individuals)-1)){
+			n_m2[ind] = p1.individuals[ind].countOfMutationsOfType(m2);
+			n_m3[ind] = p1.individuals[ind].countOfMutationsOfType(m3);
+			n_m4[ind] = p1.individuals[ind].countOfMutationsOfType(m4);
+			n_m5[ind] = p1.individuals[ind].countOfMutationsOfType(m5);
+			n_m6[ind] = p1.individuals[ind].countOfMutationsOfType(m6);
+		}
+
+	writeFile("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/burnin_62500_results.txt",
+		sim.cycle + "," +
+		size(p1.individuals) + "," +
+		size(p1.individuals[p1.individuals.sex == "M" & p1.individuals.age >= 1]) + "," +
+		size(p1.individuals[p1.individuals.sex == "F" & p1.individuals.age >= 1]) + "," +
+		mean(c(repro_m, repro_f)) + "," +
+		calcPi(p1.haplosomes) + "," +
+		mean(p1.cachedFitness(NULL)) + "," +
+		calcMeanFroh(p1.individuals) + "," +
+		calcInbreedingLoad(p1.haplosomes) + "," +
+		calcHeterozygosity(p1.haplosomes)+ "," +
+		mean(n_m2) + "," +
+		mean(n_m3) + "," +
+		mean(n_m4) + "," +
+		mean(n_m5) + "," +
+		mean(n_m6),
+		append=T);
+	}
+}
+
+//End at 300K cycles and Output Full Simulation
+late() {
+	if (sim.cycle == 300000) {
+		sim.outputFull("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/outputFull_62500.txt");
+		sim.simulationFinished();
+	}
+}

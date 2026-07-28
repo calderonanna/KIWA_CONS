@@ -6,12 +6,12 @@ initialize() {
 	
 	//CONSERVATION SCENARIOS AND REPLICATES
 	//Define burn-in end cycle, sim-end cycle, replicate, and Ka
-	defineConstant("bi_end", 10000);
-	defineConstant("scenario", "BAU");
-	defineConstant("K_cons", 9924);
-	defineConstant("sim_end", 2050);
-	defineConstant("R", "R1");
-	defineConstant("Ka", 31250);
+	defineConstant("bi_end", 300000);
+	defineConstant("scenario", "Xscenario");
+	defineConstant("K_cons", XK_cons);
+	defineConstant("sim_end", 2100);
+	defineConstant("R", "XR");
+	defineConstant("Ka", 62500);
 	
 	//DEMOGRAPHICS
 	//Define Constants and Globals for Carrying Capacity
@@ -49,23 +49,28 @@ initialize() {
 		fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,fahy_mort,1.0));
 	
 	//GENETICS
-	//Discrete Deleterious DFE (SLiM5 Manual, pg.789, Kyriazis et al. 2025, and Kim et al.2017)
-	initializeMutationType("m1", 0.45, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.001); return x;"); //weak
-	initializeMutationType("m2", 0.2, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.01 | x >= -0.001); return x;"); //moderate
-	initializeMutationType("m3", 0.05, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.1 | x >= -0.01); return x;"); //strong
-	initializeMutationType("m4", 0.0, "s", "do x=rgamma(1,-0.01314833,0.186); while (x >= -0.1); return x;"); // semi-lethal
-	initializeMutationType("m5", 0.0, "f", -1.0); //lethal
+	// Discrete Deleterious DFE (SLiM5 Manual, pg.789, Kyriazis et al. 2025, and Kim et al.2017)
+	initializeMutationType("m1", 0.5, "f", 0); // neutral 
+	initializeMutationType("m2", 0.45, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.001); return x;"); // weak
+	initializeMutationType("m3", 0.2, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.01 | x >= -0.001); return x;"); // moderate
+	initializeMutationType("m4", 0.05, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < -0.1 | x >= -0.01); return x;"); // strong
+	initializeMutationType("m5", 0.0, "s", "do x=rgamma(1,-0.01314833,0.186); while (x >= -0.1); return x;"); // semi-lethal
+	initializeMutationType("m6", 0.0, "f", -1.0); // lethal
 	
 	//Mutation Proportions (99.5% nonlethals, 0.5% lethal)
-	P_weak = 0.491*0.995;
-	P_moderate = 0.247*0.995;
-	P_strong = 0.236*0.995;
-	P_semilethal = 0.026*0.995;
-	P_lethal = 0.005;
-	initializeGenomicElementType("g1", c(m1,m2,m3,m4,m5), c(P_weak, P_moderate, P_strong, P_semilethal, P_lethal));
-	
+	P_neu = 0.189; // 0-fold=12564910
+	P_del = 0.811; // 4-fold=2946013
+	P_nonlethal = 0.995*P_del;
+	P_lethal = 0.005*P_del;
+	P_semilethal = 0.026*P_nonlethal;
+	P_strong = 0.236*P_nonlethal;
+	P_moderate = 0.247*P_nonlethal;
+	P_weak = 0.491*P_nonlethal;
+	initializeGenomicElementType("g1", c(m1,m2,m3,m4,m5,m6), c(P_neu, P_weak, P_moderate, P_strong, P_semilethal, P_lethal));
+	initializeGenomicElementType("g2", m1, 1);
+
 	//Import Chr1 Structure
-	path = "~/Desktop/KIWA_CONS/data/slim/genome_structure/";
+	path = "/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/genome_structure/";
 	chr = 1;
 	length = 114063801;
 	initializeChromosome(id=chr, length=length);
@@ -75,8 +80,14 @@ initialize() {
 		components = strsplit(exon, "\t");
 		initializeGenomicElement(g1, asInteger(components[0])-1, asInteger(components[1])-1);
 	}
+
+	intergenics = readFile(path + "intergenic_chr" + chr + ".txt");
+	for (intergenic in intergenics) {
+		components = strsplit(intergenic, "\t");
+		initializeGenomicElement(g2, asInteger(components[0])-1, asInteger(components[1])-1);
+	}
 	
-	//Set Recombination Rate and Mutation Rate
+	//Set Recombination Rate & Mutation Rate
 	initializeRecombinationRate(3e-8);
 	initializeMutationRate(4e-9);
 }
@@ -117,7 +128,7 @@ reproduction(){
 
 //IMPORT BURN-IN
 bi_end early() {
-	sim.readFromPopulationFile("~/Desktop/burnin_31250.txt");
+	sim.readFromPopulationFile("/storage/group/zps5164/default/abc6435/KIWA_CONS/data/slim/burnin/outputFull_62500.txt");
 }
 
 //RUN SIMULAION
@@ -171,20 +182,20 @@ early() {
 	repro_f = p1.individuals[p1.individuals.sex=="F" & p1.individuals.age>=1].age;
 	
 	//Mutation Counts
-	n_m1 = integer(size(p1.individuals));
 	n_m2 = integer(size(p1.individuals));
 	n_m3 = integer(size(p1.individuals));
 	n_m4 = integer(size(p1.individuals));
 	n_m5 = integer(size(p1.individuals));
+	n_m6 = integer(size(p1.individuals));
 	for (ind in seq(0,size(p1.individuals)-1)){
-		n_m1[ind] = p1.individuals[ind].countOfMutationsOfType(m1);
 		n_m2[ind] = p1.individuals[ind].countOfMutationsOfType(m2);
 		n_m3[ind] = p1.individuals[ind].countOfMutationsOfType(m3);
 		n_m4[ind] = p1.individuals[ind].countOfMutationsOfType(m4);
 		n_m5[ind] = p1.individuals[ind].countOfMutationsOfType(m5);
+		n_m6[ind] = p1.individuals[ind].countOfMutationsOfType(m6);
 	};
 	
-	writeFile("~/Desktop/main_31250_results.txt",
+	writeFile("/storage/home/abc6435/SzpiechLab/abc6435/KIWA_CONS/data/slim/main/main_62500_results.txt",
 		sim.cycle + "," +
 		size(p1.individuals) + "," +
 		size(p1.individuals[p1.individuals.sex == "M" & p1.individuals.age >= 1]) + "," +
@@ -195,11 +206,11 @@ early() {
 		calcMeanFroh(p1.individuals) + "," +
 		calcInbreedingLoad(p1.haplosomes) + "," +
 		calcHeterozygosity(p1.haplosomes)+ "," +
-		mean(n_m1) + "," +
 		mean(n_m2) + "," +
 		mean(n_m3) + "," +
 		mean(n_m4) + "," +
 		mean(n_m5) + "," +
+		mean(n_m6) + "," +
 		R + "," +
 		Ka + "," +
 		scenario,
@@ -209,7 +220,7 @@ early() {
 //END SIMULATION
 late (){
 	
-	//End Sim After Year 2500 Or If Extinction Occurs.
+	//End Sim After Year 2100 Or If Extinction Occurs.
 	if (sim.cycle > (bi_end+sim_end) | p1.individualCount < 10){
 		sim.simulationFinished();
 	}
